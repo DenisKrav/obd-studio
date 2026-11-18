@@ -8,6 +8,7 @@ except ImportError:
     serial = None
 
 from .config import ECU_ADDRESS, TESTER_ADDRESS, Timing
+from .i18n import tr
 from .protocol import ObdError, busy_wait, checksum, hexs, parse_iso9141, parse_kwp, wait_until
 
 __all__ = ["KLine", "ObdError"]
@@ -52,10 +53,11 @@ class KLine:
                 self.ser = serial.Serial(self.port, self.t.baud,
                                          timeout=self.t.serial_read_timeout, write_timeout=1)
             except serial.SerialException as e:
-                raise ObdError(f"Не вдалося відкрити {self.port}: {e}\n"
-                               "Можливо, порт зайнятий іншою програмою (наприклад, VCDS-Lite).")
+                raise ObdError(tr("Не вдалося відкрити {port}: {error}\n"
+                                  "Можливо, порт зайнятий іншою програмою (наприклад, VCDS-Lite).")
+                               .format(port=self.port, error=e))
             self.ser.break_condition = False
-            self.log(f"Порт {self.port} відкрито, {self.t.baud} бод")
+            self.log(tr("Порт {port} відкрито, {baud} бод").format(port=self.port, baud=self.t.baud))
 
     def close(self):
         if self.ser:
@@ -123,9 +125,10 @@ class KLine:
                 mismatch = True
         self.log(f"→ {hexs(data)}", raw=True)
         if mismatch:
-            hint = ("" if odd else " — кабель не повертає надіслане: чи є живлення 12 В "
-                                   "на роз’ємі (увімкнене запалювання)?")
-            self.log(f"   (луна не збіглася: {hexs(odd) or 'немає'}){hint}", raw=True)
+            hint = ("" if odd else tr(" — кабель не повертає надіслане: чи є живлення 12 В "
+                                      "на роз’ємі (увімкнене запалювання)?"))
+            self.log(tr("   (луна не збіглася: {echo})").format(echo=hexs(odd) or tr("немає")) + hint,
+                     raw=True)
 
     # ── способи ініціалізації ──
     def _idle(self, seconds):
@@ -138,10 +141,10 @@ class KLine:
         req += bytes([checksum(req)])
         self._send_raw(req)
         resp = self._read_until_silence(first_timeout=self.t.start_comm_timeout)
-        self.log(f"← {hexs(resp) if resp else '(тиша)'}")
+        self.log(f"← {hexs(resp) if resp else tr('(тиша)')}")
         for p in parse_kwp(resp):
             if p and p[0] == 0xC1:
-                self.log(f"Блок відповів! Ключові байти: {hexs(p[1:3])}")
+                self.log(tr("Блок відповів! Ключові байти: {kb}").format(kb=hexs(p[1:3])))
                 return True
         return False
 
@@ -157,8 +160,8 @@ class KLine:
         wait_until(t)
         t_req = time.perf_counter()
         ok = self._start_comm()
-        self.log(f"   (виміряно на ПК: нуль {(t_high - t_low) * 1000:.1f} мс, "
-                 f"від початку імпульсу до запиту {(t_req - t_low) * 1000:.1f} мс)")
+        self.log(tr("   (виміряно на ПК: нуль {low:.1f} мс, від початку імпульсу до запиту "
+                    "{req:.1f} мс)").format(low=(t_high - t_low) * 1000, req=(t_req - t_low) * 1000))
         return ok
 
     def _fast_init_360(self):
@@ -173,9 +176,10 @@ class KLine:
         wait_until(t0 + self.t.fast_360_total)
         t_req = time.perf_counter()
         ok = self._start_comm()
-        self.log(f"   (виміряно на ПК: луна 0x00 {hexs(echo) or 'немає'} через "
-                 f"{(t_echo - t0) * 1000:.1f} мс, від початку імпульсу до запиту "
-                 f"{(t_req - t0) * 1000:.1f} мс)")
+        self.log(tr("   (виміряно на ПК: луна 0x00 {echo} через {echo_ms:.1f} мс, від початку "
+                    "імпульсу до запиту {req:.1f} мс)").format(
+                        echo=hexs(echo) or tr("немає"), echo_ms=(t_echo - t0) * 1000,
+                        req=(t_req - t0) * 1000))
         return ok
 
     def _slow_init(self):
@@ -197,21 +201,21 @@ class KLine:
                 sync = b
                 break
             if b:
-                self.log(f"   (сторонній байт {hexs(b)})")
+                self.log(tr("   (сторонній байт {byte})").format(byte=hexs(b)))
         if not sync:
-            self.log("← немає байта синхронізації 0x55")
+            self.log(tr("← немає байта синхронізації 0x55"))
             return False
-        self.log(f"   (0x55 прийшов через {(time.perf_counter() - t_addr_end) * 1000:.0f} мс "
-                 "після адреси)")
+        self.log(tr("   (0x55 прийшов через {ms:.0f} мс після адреси)").format(
+            ms=(time.perf_counter() - t_addr_end) * 1000))
         kb = self._read_exact(2, timeout=self.t.slow_kb_timeout)
         if len(kb) < 2:
-            self.log(f"← 55 {hexs(kb)} (ключові байти неповні)")
+            self.log(tr("← 55 {kb} (ключові байти неповні)").format(kb=hexs(kb)))
             return False
-        self.log(f"← 55 {hexs(kb)}  (синхронізація OK, ключові байти {hexs(kb)})")
+        self.log(tr("← 55 {kb}  (синхронізація OK, ключові байти {kb})").format(kb=hexs(kb)))
         busy_wait(self.t.slow_kb2_delay)
         self._send_raw([(~kb[1]) & 0xFF])
         ack = self._read_exact(1, timeout=self.t.slow_ack_timeout)
-        self.log(f"← {hexs(ack) if ack else '(тиша)'}")
+        self.log(f"← {hexs(ack) if ack else tr('(тиша)')}")
         if ack != bytes([(~ECU_ADDRESS) & 0xFF]):
             return False
         if kb[0] == kb[1] and kb[0] in (0x08, 0x94):
@@ -224,31 +228,31 @@ class KLine:
     def init_attempts(self):
         attempts = []
         if self.t.try_fast_break:
-            attempts.append(("KWP2000, швидкий старт", self._fast_init_break, "KWP"))
+            attempts.append((tr("KWP2000, швидкий старт"), self._fast_init_break, "KWP"))
         if self.t.try_fast_360:
-            attempts.append(("KWP2000, швидкий старт (спосіб 2)", self._fast_init_360, "KWP"))
+            attempts.append((tr("KWP2000, швидкий старт (спосіб 2)"), self._fast_init_360, "KWP"))
         if self.t.try_slow:
-            attempts.append(("повільний старт 5 бод", self._slow_init, None))
+            attempts.append((tr("повільний старт 5 бод"), self._slow_init, None))
         return attempts
 
     def connect(self):
         attempts = self.init_attempts()
         if not attempts:
-            raise ObdError("У налаштуваннях вимкнено всі способи підключення.")
+            raise ObdError(tr("У налаштуваннях вимкнено всі способи підключення."))
         self.open()
-        self.log("Параметри ініціалізації:")
+        self.log(tr("Параметри ініціалізації:"))
         for line in self.t.describe():
             self.log(line)
         total = len(attempts)
         for i, (name, func, proto) in enumerate(attempts):
             if i:
-                self.log(f"Пауза {self.t.retry_pause:g} с перед наступною спробою…")
+                self.log(tr("Пауза {pause:g} с перед наступною спробою…").format(pause=self.t.retry_pause))
                 time.sleep(self.t.retry_pause)
-            self.log(f"── Спроба {i + 1}/{total}: {name}")
+            self.log(tr("── Спроба {n}/{total}: {name}").format(n=i + 1, total=total, name=name))
             try:
                 ok = func()
             except serial.SerialException as e:
-                raise ObdError(f"Помилка порту: {e}")
+                raise ObdError(tr("Помилка порту: {error}").format(error=e))
             finally:
                 if self.ser:
                     self.ser.break_condition = False
@@ -261,9 +265,9 @@ class KLine:
                 self.last_comm = time.perf_counter()
                 proto_name = "ISO 9141-2" if self.protocol == "ISO9141" else "ISO 14230-4 (KWP2000)"
                 return f"{proto_name}, {name}"
-        raise ObdError("Машина не відповіла жодним способом.\n\n"
-                       "Перевірте, що запалювання увімкнене, кабель щільно сидить у роз’ємі, "
-                       "і спробуйте ще раз. Якщо не вийде — збережіть журнал і надішліть його.")
+        raise ObdError(tr("Машина не відповіла жодним способом.\n\n"
+                          "Перевірте, що запалювання увімкнене, кабель щільно сидить у роз’ємі, "
+                          "і спробуйте ще раз. Якщо не вийде — збережіть журнал і надішліть його."))
 
     def keepalive(self):
         """Не дає сесії K-лінії згаснути, поки програма простоює (блок тримає її ~5 с).
@@ -285,16 +289,16 @@ class KLine:
 
     def ensure_session(self):
         if self.protocol is None:
-            raise ObdError("Спершу натисніть «Підключитися».")
+            raise ObdError(tr("Спершу натисніть «Підключитися»."))
         if time.perf_counter() - self.last_comm > self.t.session_timeout:
-            self.log("Сесія могла завершитися — перепідключаюся…")
+            self.log(tr("Сесія могла завершитися — перепідключаюся…"))
             ok = self.method()
             if not ok:
                 time.sleep(self.t.retry_pause)
                 ok = self.method()
             if not ok:
                 self.protocol = None
-                raise ObdError("Зв’язок із машиною втрачено. Натисніть «Підключитися» ще раз.")
+                raise ObdError(tr("Зв’язок із машиною втрачено. Натисніть «Підключитися» ще раз."))
             self.last_comm = time.perf_counter()
         wait_until(self.last_comm + self.t.p3_min)
 
@@ -317,7 +321,7 @@ class KLine:
             first = max(first, self.t.response_dtc_timeout)
         resp = self._read_until_silence(first_timeout=first)
         self.last_comm = time.perf_counter() if resp else 0.0
-        self.log(f"← {hexs(resp) if resp else '(тиша)'}", raw=True)
+        self.log(f"← {hexs(resp) if resp else tr('(тиша)')}", raw=True)
         if self.protocol == "ISO9141":
             payloads = parse_iso9141(resp) or parse_kwp(resp)
         else:
@@ -327,5 +331,5 @@ class KLine:
             if p and p[0] == expect_sid:
                 result.append(p)
             elif len(p) >= 3 and p[0] == 0x7F:
-                self.log(f"   Блок відмовив: сервіс {p[1]:02X}, причина {p[2]:02X}")
+                self.log(tr("   Блок відмовив: сервіс {sid:02X}, причина {nrc:02X}").format(sid=p[1], nrc=p[2]))
         return result

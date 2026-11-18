@@ -15,6 +15,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .i18n import tr
+
 SETTINGS_FILE = "obd_studio_settings.json"
 LEGACY_SETTINGS_FILE = "lancer_obd_settings.json"   # версії 0.x зберігали лише Timing
 
@@ -91,11 +93,11 @@ class Timing:
             v = getattr(self, f.name)
             kind = f.metadata["kind"]
             if kind == "ms":
-                shown = f"{v * 1000:g} мс"
+                shown = f"{v * 1000:g} {tr('мс')}"
             elif kind == "bool":
-                shown = "так" if v else "ні"
+                shown = tr("так") if v else tr("ні")
             else:
-                shown = f"{v} {f.metadata.get('unit', '')}".strip()
+                shown = f"{v} {tr(f.metadata.get('unit', ''))}".strip()
             lines.append(f"  {f.name} = {shown}")
         return lines
 
@@ -132,6 +134,7 @@ class AppSettings:
     elm_timeout: float = 5.0          # секунди очікування відповіді ELM327
     brand: str = "auto"               # ключ профілю марки або "auto" (за VIN)
     theme: str = "dark"               # "dark" | "light"
+    language: str = ""                # "uk" | "en"; порожньо — за мовою Windows
     live_pids: list = field(default_factory=list)
 
     @classmethod

@@ -12,8 +12,9 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, 
                                QMainWindow, QMessageBox, QProgressBar, QPushButton, QStackedWidget,
                                QVBoxLayout, QWidget)
 
-from .. import APP_NAME, __version__
+from .. import APP_NAME, __version__, i18n
 from ..config import save_all, settings_path
+from ..i18n import system_language, tr
 from ..history import add_entry, history_path, load_history
 from ..pids import DEFAULT_LIVE, PIDS, format_value
 from ..report import build_html
@@ -72,6 +73,7 @@ def list_ports():
 class MainWindow(QMainWindow):
     def __init__(self, timing, app_settings):
         super().__init__()
+        i18n.set_language(app_settings.language or system_language())
         self.setWindowTitle(f"{APP_NAME}")
         self.setWindowIcon(app_icon())
         self.resize(1320, 860)
@@ -95,15 +97,15 @@ class MainWindow(QMainWindow):
         c.live_values.connect(self.on_live_values)
         c.live_state.connect(lambda _on: self.refresh_all())
         c.voltage.connect(lambda v: self.p_over.set_voltage(v))
-        c.cleared.connect(lambda: self.toast("Коди помилок стерто. Вимкніть і знову увімкніть запалювання."))
+        c.cleared.connect(lambda: self.toast(tr("Коди помилок стерто. Вимкніть і знову увімкніть запалювання.")))
         c.scan_done.connect(self.on_scan_done)
 
         self.build_ui()
         self.on_log(f"{APP_NAME} {__version__}, Python {platform.python_version()}, "
                     f"pyserial {getattr(serial, '__version__', '?')}, {platform.system()} {platform.release()}")
-        self.on_log(f"Файл налаштувань: {settings_path()}")
+        self.on_log(tr("Файл налаштувань: {path}").format(path=settings_path()))
         for dev, desc in list_ports():
-            self.on_log(f"Порт {dev}: {desc}")
+            self.on_log(tr("Порт {port}: {desc}").format(port=dev, desc=desc))
 
     # ─────────── побудова інтерфейсу ───────────
     def build_ui(self):
@@ -141,10 +143,12 @@ class MainWindow(QMainWindow):
         self.p_vehicle = VehiclePage(c)
         self.p_log = LogPage()
         self.p_settings = SettingsPage(
-            c, f"Налаштування: {settings_path()}\nІсторія: {history_path()}",
-            f"{APP_NAME} {__version__} — універсальна діагностика OBD-II для кабелю KKL і адаптерів "
-            "ELM327. Програма надсилає лише стандартні запити OBD-II на читання; єдина команда, що "
-            "змінює стан блока, — стирання кодів помилок (режим 04), і лише за вашим підтвердженням.")
+            c, tr("Налаштування: {settings}\nІсторія: {history}").format(settings=settings_path(),
+                                                                          history=history_path()),
+            tr("{app} {version} — універсальна діагностика OBD-II для кабелю KKL і адаптерів "
+               "ELM327. Програма надсилає лише стандартні запити OBD-II на читання; єдина команда, що "
+               "змінює стан блока, — стирання кодів помилок (режим 04), і лише за вашим "
+               "підтвердженням.").format(app=APP_NAME, version=__version__))
         self.pages = {"overview": self.p_over, "connection": self.p_conn, "dtc": self.p_dtc,
                       "live": self.p_live, "readiness": self.p_ready, "freeze": self.p_freeze,
                       "vehicle": self.p_vehicle, "log": self.p_log, "settings": self.p_settings}
@@ -158,10 +162,11 @@ class MainWindow(QMainWindow):
         self.p_live.record_toggled.connect(self.on_record)
         self.p_log.save.connect(self.save_log)
         self.p_settings.theme_changed.connect(self.set_theme)
+        self.p_settings.language_changed.connect(self.set_language)
         self.p_settings.timing_saved.connect(self.on_timing_saved)
         self.p_settings.app_changed.connect(self.save_settings)
 
-        # відновлення стану після перебудови (зміна теми)
+        # відновлення стану після перебудови (зміна теми чи мови)
         self.p_log.text.setPlainText("\n".join(self.log_lines))
         self.p_dtc.show_dtcs(c.dtcs)
         self.p_ready.show_readiness(c.readiness)
@@ -192,7 +197,7 @@ class MainWindow(QMainWindow):
         col = QVBoxLayout()
         col.setSpacing(0)
         col.addWidget(label(APP_NAME, "brandTitle"))
-        col.addWidget(label("Діагностика OBD-II", "brandSub"))
+        col.addWidget(label(tr("Діагностика OBD-II"), "brandSub"))
         brand.addLayout(col, 1)
         lay.addLayout(brand)
         lay.addSpacing(14)
@@ -201,9 +206,9 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         for section, items in NAV:
-            lay.addWidget(label(section.upper(), "navSection"))
+            lay.addWidget(label(tr(section).upper(), "navSection"))
             for key, icon_name, text in items:
-                b = QPushButton(f"  {text}")
+                b = QPushButton(f"  {tr(text)}")
                 b.setObjectName("nav")
                 b.setCheckable(True)
                 b.setCursor(Qt.PointingHandCursor)
@@ -224,8 +229,8 @@ class MainWindow(QMainWindow):
         bl.addWidget(self.conn_dot, 0, Qt.AlignVCenter)
         tcol = QVBoxLayout()
         tcol.setSpacing(0)
-        self.conn_title = label("Не підключено", "connTitle")
-        self.conn_sub = label("Адаптер не вибрано", "connSub")
+        self.conn_title = label(tr("Не підключено"), "connTitle")
+        self.conn_sub = label(tr("Адаптер не вибрано"), "connSub")
         self.conn_sub.setWordWrap(True)
         tcol.addWidget(self.conn_title)
         tcol.addWidget(self.conn_sub)
@@ -241,7 +246,7 @@ class MainWindow(QMainWindow):
         bar.setFixedHeight(30)
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(16, 0, 16, 0)
-        self.status_text = label("Готово", "statusText")
+        self.status_text = label(self.status_msg or tr("Готово"), "statusText")
         lay.addWidget(self.status_text, 1)
         self.status_right = label("", "statusText")
         lay.addWidget(self.status_right)
@@ -266,20 +271,20 @@ class MainWindow(QMainWindow):
         c = self.ctl
         if c.connected:
             self.conn_dot.set_tone("success")
-            self.conn_title.setText("Підключено")
+            self.conn_title.setText(tr("Підключено"))
             self.conn_sub.setText(c.vehicle_title())
             self.status_right.setText(f"{c.protocol_desc}   ·   {c.adapter_desc}")
         else:
             self.conn_dot.set_tone("warning" if c.is_busy else "neutral")
-            self.conn_title.setText("Підключення…" if c.is_busy else "Не підключено")
+            self.conn_title.setText(tr("Підключення…") if c.is_busy else tr("Не підключено"))
             from .controller import ADAPTER_NAMES
             where = c.app.port if c.app.adapter != "elm_wifi" else c.app.wifi_host
-            self.conn_sub.setText(f"{ADAPTER_NAMES[c.app.adapter]}" + (f", {where}" if where else ""))
+            self.conn_sub.setText(tr(ADAPTER_NAMES[c.app.adapter]) + (f", {where}" if where else ""))
             self.status_right.setText("")
 
     def toast(self, text):
         self.status_text.setText(text)
-        QTimer.singleShot(8000, lambda: self.status_text.setText(self.status_msg or "Готово")
+        QTimer.singleShot(8000, lambda: self.status_text.setText(self.status_msg or tr("Готово"))
                           if self.status_text.text() == text else None)
 
     # ─────────── сигнали контролера ───────────
@@ -295,11 +300,11 @@ class MainWindow(QMainWindow):
     def on_busy(self, busy, title):
         self.progress.setVisible(busy)
         self.status_msg = title if busy else ""
-        self.status_text.setText(title if busy else "Готово")
+        self.status_text.setText(title if busy else tr("Готово"))
         self.refresh_all()
 
     def on_error(self, text):
-        self.status_text.setText("Помилка: " + text.splitlines()[0])
+        self.status_text.setText(tr("Помилка: {text}").format(text=text.splitlines()[0]))
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Warning)
         box.setWindowTitle(APP_NAME)
@@ -307,8 +312,8 @@ class MainWindow(QMainWindow):
         rest = "\n\n".join(text.split("\n\n")[1:])
         if rest:
             box.setInformativeText(rest)
-        box.addButton("Гаразд", QMessageBox.AcceptRole)
-        log_btn = box.addButton("Відкрити журнал", QMessageBox.ActionRole)
+        box.addButton(tr("Гаразд"), QMessageBox.AcceptRole)
+        log_btn = box.addButton(tr("Відкрити журнал"), QMessageBox.ActionRole)
         box.exec()
         if box.clickedButton() is log_btn:
             self.navigate("log")
@@ -353,11 +358,12 @@ class MainWindow(QMainWindow):
         try:
             self.history = add_entry(entry)
         except OSError as e:
-            self.on_log(f"Не вдалося зберегти історію: {e}")
+            self.on_log(tr("Не вдалося зберегти історію: {error}").format(error=e))
             self.history = self.history + [dict(entry, date=datetime.datetime.now().isoformat())]
         self.p_over.set_history(self.history)
         n = len(set(entry["stored"]) | set(entry["pending"]) | set(entry["permanent"]))
-        self.toast("Сканування завершено: " + ("помилок не знайдено" if not n else f"знайдено кодів: {n}"))
+        self.toast(tr("Сканування завершено: помилок не знайдено") if not n else
+                   tr("Сканування завершено: знайдено кодів: {n}").format(n=n))
         self.refresh_all()
 
     # ─────────── дії ───────────
@@ -365,20 +371,20 @@ class MainWindow(QMainWindow):
         if not on:
             if self.recorder:
                 self.recorder[0].close()
-                self.on_log("Запис CSV зупинено")
+                self.on_log(tr("Запис CSV зупинено"))
             self.recorder = None
             return
         name = datetime.datetime.now().strftime("obd_studio_live_%Y-%m-%d_%H-%M.csv")
-        path, _ = QFileDialog.getSaveFileName(self, "Записувати дані у файл", name, "CSV (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(self, tr("Записувати дані у файл"), name, "CSV (*.csv)")
         if not path:
             self.p_live.btn_rec.setChecked(False)
             return
         pids = list(self.ctl.live_pids)
         f = open(path, "w", newline="", encoding="utf-8-sig")
         writer = csv.writer(f, delimiter=";")
-        writer.writerow(["Час"] + [f"{PIDS[p].name}, {PIDS[p].unit}".rstrip(", ") for p in pids])
+        writer.writerow([tr("Час")] + [f"{tr(PIDS[p].name)}, {tr(PIDS[p].unit)}".rstrip(", ") for p in pids])
         self.recorder = (f, writer, pids)
-        self.on_log(f"Запис CSV: {path}")
+        self.on_log(tr("Запис CSV: {path}").format(path=path))
         if not self.ctl.is_live and self.ctl.connected:
             self.ctl.start_live()
 
@@ -392,44 +398,45 @@ class MainWindow(QMainWindow):
             "live": dict(c.live_last), "brand": c.brand_name(),
         }
         name = now.strftime("obd_studio_report_%Y-%m-%d_%H-%M.html")
-        path, _ = QFileDialog.getSaveFileName(self, "Зберегти звіт", name, "HTML (*.html)")
+        path, _ = QFileDialog.getSaveFileName(self, tr("Зберегти звіт"), name, "HTML (*.html)")
         if not path:
             return
         Path(path).write_text(build_html(data), encoding="utf-8")
-        self.toast(f"Звіт збережено: {path}")
+        self.toast(tr("Звіт збережено: {path}").format(path=path))
         QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def save_log(self):
         name = datetime.datetime.now().strftime("obd_studio_%Y-%m-%d_%H-%M.txt")
-        path, _ = QFileDialog.getSaveFileName(self, "Зберегти журнал", name, "Текстовий файл (*.txt)")
+        path, _ = QFileDialog.getSaveFileName(self, tr("Зберегти журнал"), name,
+                                              tr("Текстовий файл") + " (*.txt)")
         if not path:
             return
         c = self.ctl
         with open(path, "w", encoding="utf-8") as f:
             f.write(f"=== {APP_NAME} {__version__} ===\n")
-            f.write(f"Авто: {c.vehicle_title()}\nVIN: {c.vin_info.get('vin', '')}\n")
-            f.write(f"Адаптер: {c.adapter_desc}\nПротокол: {c.protocol_desc}\n")
+            f.write(f"{tr('Авто')}: {c.vehicle_title()}\nVIN: {c.vin_info.get('vin', '')}\n")
+            f.write(f"{tr('Адаптер')}: {c.adapter_desc}\n{tr('Протокол')}: {c.protocol_desc}\n")
             if c.dtcs is not None:
-                f.write(f"Коди: {c.dtcs}\n")
-            f.write("\n=== Журнал ===\n")
+                f.write(f"{tr('Коди')}: {c.dtcs}\n")
+            f.write(f"\n=== {tr('Журнал')} ===\n")
             f.write("\n".join(self.log_lines) + "\n")
-        self.toast(f"Журнал збережено: {path}")
+        self.toast(tr("Журнал збережено: {path}").format(path=path))
 
     def save_settings(self):
         try:
             save_all(self.ctl.timing, self.ctl.app)
         except OSError as e:
-            self.on_log(f"Не вдалося зберегти налаштування: {e}")
+            self.on_log(tr("Не вдалося зберегти налаштування: {error}").format(error=e))
         self.p_vehicle.update_view() if hasattr(self, "p_vehicle") else None
         self.refresh_all()
 
     def on_timing_saved(self, timing):
         self.ctl.timing = timing
         self.save_settings()
-        self.on_log("Нові параметри K-лінії (діють з наступного підключення):")
+        self.on_log(tr("Нові параметри K-лінії (діють з наступного підключення):"))
         for line in timing.describe():
             self.on_log(line)
-        self.toast("Параметри збережено. Вони діятимуть з наступного підключення.")
+        self.toast(tr("Параметри збережено. Вони діятимуть з наступного підключення."))
 
     def set_theme(self, name):
         if name == Theme.name:
@@ -437,6 +444,16 @@ class MainWindow(QMainWindow):
         self.ctl.app.theme = name
         Theme.set(name)
         QApplication.instance().setStyleSheet(app_stylesheet())
+        old = self.centralWidget()
+        self.build_ui()
+        old.deleteLater()
+        self.save_settings()
+
+    def set_language(self, code):
+        if code == i18n.language():
+            return
+        self.ctl.app.language = code
+        i18n.set_language(code)
         old = self.centralWidget()
         self.build_ui()
         old.deleteLater()

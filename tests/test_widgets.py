@@ -11,7 +11,7 @@ from PySide6.QtCore import QPoint, QPointF, Qt  # noqa: E402
 from PySide6.QtGui import QWheelEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from obd_studio.ui.widgets import ComboBox, SpinBox  # noqa: E402
+from obd_studio.ui.widgets import ComboBox, SpinBox, TabWidget  # noqa: E402
 
 
 def wheel(widget, delta=-120):
@@ -36,3 +36,14 @@ def test_spinbox_ignores_wheel_without_focus(qapp):
     spin.setValue(5)
     wheel(spin, 120)
     assert spin.value() == 5
+
+
+def test_tabs_ignore_wheel(qapp):
+    from PySide6.QtWidgets import QWidget
+    tabs = TabWidget()
+    for name in ("A", "B", "C"):
+        tabs.addTab(QWidget(), name)
+    tabs.setCurrentIndex(1)
+    ev = wheel(tabs.tabBar())
+    assert tabs.currentIndex() == 1
+    assert not ev.isAccepted()            # подія піде далі — до прокрутки сторінки
