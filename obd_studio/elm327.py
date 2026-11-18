@@ -14,6 +14,7 @@ try:
 except ImportError:
     serial = None
 
+from .i18n import tr
 from .protocol import ObdError, hexs
 
 PROTOCOLS = {
@@ -123,12 +124,17 @@ class Elm327:
             self.ser = serial.serial_for_url(self.url, baudrate=baud or self.baud,
                                              timeout=0.05, write_timeout=2)
         except (serial.SerialException, ValueError, OSError) as e:
-            where = "адаптера Wi-Fi" if self.is_wifi else f"порту {self.url}"
-            hint = ("Перевірте, що ноутбук підключено до Wi-Fi мережі адаптера."
-                    if self.is_wifi else
-                    "Можливо, порт зайнятий іншою програмою або адаптер не спарено.")
-            raise ObdError(f"Не вдалося відкрити {where}: {e}\n{hint}")
-        self.log(f"Відкрито {self.url}" + ("" if self.is_wifi else f", {baud or self.baud} бод"))
+            if self.is_wifi:
+                msg = tr("Не вдалося відкрити адаптера Wi-Fi: {error}\n"
+                         "Перевірте, що ноутбук підключено до Wi-Fi мережі адаптера.")
+            else:
+                msg = tr("Не вдалося відкрити порту {port}: {error}\n"
+                         "Можливо, порт зайнятий іншою програмою або адаптер не спарено.")
+            raise ObdError(msg.format(port=self.url, error=e))
+        if self.is_wifi:
+            self.log(tr("Відкрито {url}").format(url=self.url))
+        else:
+            self.log(tr("Відкрито {url}, {baud} бод").format(url=self.url, baud=baud or self.baud))
 
     def close(self):
         if self.ser:
@@ -159,9 +165,9 @@ class Elm327:
         lines = [ln for ln in lines if ln and ln != ">" and ln != cmd]
         lines = [ln.rstrip(">").strip() for ln in lines]
         self.log(f"→ {cmd}", raw=raw)
-        self.log(f"← {' | '.join(lines) if lines else '(тиша)'}", raw=raw)
+        self.log(f"← {' | '.join(lines) if lines else tr('(тиша)')}", raw=raw)
         if not buf:
-            raise ObdError("Адаптер ELM327 не відповідає. Перевірте підключення.")
+            raise ObdError(tr("Адаптер ELM327 не відповідає. Перевірте підключення."))
         return [ln for ln in lines if ln]
 
     def _reset(self, attempts=1):
@@ -187,57 +193,59 @@ class Elm327:
             if version:
                 self.baud = baud
                 break
-            self.log(f"Немає відповіді ELM327 на {baud} бод")
+            self.log(tr("Немає відповіді ELM327 на {baud} бод").format(baud=baud))
             if self.ser:
                 self.ser.close()
             self.ser = None
         if not version:
-            raise ObdError("Адаптер ELM327 не відповідає.\n\n"
-                           "Перевірте, що вибрано правильний порт (для Bluetooth — вихідний COM-порт "
-                           "спареного адаптера) і що адаптер вставлено в роз’єм авто.")
+            raise ObdError(tr("Адаптер ELM327 не відповідає.\n\n"
+                              "Перевірте, що вибрано правильний порт (для Bluetooth — вихідний COM-порт "
+                              "спареного адаптера) і що адаптер вставлено в роз’єм авто."))
         self.version = version
-        self.log(f"Адаптер: {version}")
+        self.log(tr("Адаптер: {version}").format(version=version))
         for cmd in ("ATE0", "ATL0", "ATS1", "ATH1", "ATAT1", f"ATSP{self.want_protocol}"):
             self.command(cmd, timeout=2)
-        self.log("Пошук протоколу і зв’язок із блоком керування…")
+        self.log(tr("Пошук протоколу і зв’язок із блоком керування…"))
         lines = self.command("0100", timeout=max(self.timeout, self.search_timeout))
         joined = " ".join(lines).upper()
         if not any(ln.replace(" ", "").upper().find("4100") >= 0 for ln in lines):
-            reason = "Блок керування не відповів."
+            reason = tr("Блок керування не відповів.")
             if "UNABLE TO CONNECT" in joined:
-                reason = "Адаптер не зміг підключитися до блока керування (UNABLE TO CONNECT)."
+                reason = tr("Адаптер не зміг підключитися до блока керування (UNABLE TO CONNECT).")
             elif NO_DATA in joined:
-                reason = "Блок керування не відповів на запит (NO DATA)."
-            raise ObdError(f"{reason}\n\nУвімкніть запалювання, перевірте контакт у роз’ємі "
-                           "й спробуйте ще раз. Якщо авто не підтримує OBD-II, зв’язку не буде.")
+                reason = tr("Блок керування не відповів на запит (NO DATA).")
+            raise ObdError(reason + "\n\n" + tr(
+                "Увімкніть запалювання, перевірте контакт у роз’ємі "
+                "й спробуйте ще раз. Якщо авто не підтримує OBD-II, зв’язку не буде."))
         dpn = self.command("ATDPN", timeout=2)
         num = (dpn[0] if dpn else "0").upper().lstrip("A")[:1] or "0"
         self.protocol = num if num in PROTOCOLS else "6"
-        name = PROTOCOLS.get(self.protocol, "невідомий протокол")
-        return f"{name} через {version}"
+        name = tr(PROTOCOLS.get(self.protocol, "невідомий протокол"))
+        return tr("{name} через {version}").format(name=name, version=version)
 
     def request(self, data, expect_sid):
         if not self.is_connected:
-            raise ObdError("Спершу натисніть «Підключитися».")
+            raise ObdError(tr("Спершу натисніть «Підключитися»."))
         cmd = hexs(data).replace(" ", "")
         try:
             lines = self.command(cmd, raw=True)
         except serial.SerialException as e:
             self.protocol = None
-            raise ObdError(f"Зв’язок з адаптером втрачено: {e}")
+            raise ObdError(tr("Зв’язок з адаптером втрачено: {error}").format(error=e))
         upper = " ".join(lines).upper()
         if NO_DATA in upper or upper.strip() == "?":
             return []
         if any(w in upper for w in ERROR_WORDS) and not any(
                 ln[:1] in "0123456789ABCDEF" and len(ln.split()) > 2 for ln in lines):
-            self.log(f"   Адаптер повідомив про помилку: {upper}", raw=True)
+            self.log(tr("   Адаптер повідомив про помилку: {text}").format(text=upper), raw=True)
             return []
         result = []
         for _header, p in parse_frames(lines, self.protocol):
             if p and p[0] == expect_sid:
                 result.append(p)
             elif len(p) >= 3 and p[0] == 0x7F:
-                self.log(f"   Блок відмовив: сервіс {p[1]:02X}, причина {p[2]:02X}", raw=True)
+                self.log(tr("   Блок відмовив: сервіс {sid:02X}, причина {nrc:02X}").format(sid=p[1], nrc=p[2]),
+                         raw=True)
         return result
 
     def keepalive(self):

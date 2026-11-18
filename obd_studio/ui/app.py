@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from .. import APP_NAME
 from ..config import load_all
+from ..i18n import set_language, system_language
 from .main_window import MainWindow, app_icon, app_stylesheet
 from .theme import Theme
 
@@ -24,6 +25,7 @@ def main():
     app.setFont(QFont("Segoe UI", 10))
     timing, settings = load_all()
     Theme.set(settings.theme)
+    set_language(settings.language or system_language())   # порожньо — за мовою Windows
     app.setStyleSheet(app_stylesheet())
     win = MainWindow(timing, settings)
     win.show()

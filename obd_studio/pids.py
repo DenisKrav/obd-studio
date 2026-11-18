@@ -2,6 +2,8 @@
 
 from collections import namedtuple
 
+from .i18n import tr
+
 PidDef = namedtuple("PidDef", "pid name short unit decode decimals lo hi")
 
 
@@ -119,4 +121,4 @@ def format_value(pid, value, with_unit=True):
     if p is None or value is None:
         return "—"
     text = f"{value:.{p.decimals}f}"
-    return f"{text} {p.unit}".strip() if with_unit else text
+    return f"{text} {tr(p.unit)}".strip() if with_unit else text

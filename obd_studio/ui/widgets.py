@@ -9,6 +9,7 @@ from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath
 from PySide6.QtWidgets import (QComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
                                QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
 
+from ..i18n import tr
 from . import icons
 from .theme import Theme
 
@@ -373,7 +374,7 @@ class LiveChart(QWidget):
         f.setWeight(QFont.DemiBold)
         p.setFont(f)
         p.setPen(qc("text"))
-        p.drawText(QRectF(left, 6, w, 24), Qt.AlignLeft | Qt.AlignVCenter, self.title or "Графік")
+        p.drawText(QRectF(left, 6, w, 24), Qt.AlignLeft | Qt.AlignVCenter, self.title or tr("Графік"))
         if self.points:
             last = self.points[-1][1]
             p.setPen(qc("accent2"))
@@ -404,11 +405,11 @@ class LiveChart(QWidget):
             x = left + w * (1 - sec / self.window)
             p.setPen(qc("faint"))
             p.drawText(QRectF(x - 30, top + h + 6, 60, 16), Qt.AlignCenter,
-                       f"-{sec} с" if sec else "зараз")
+                       tr("-{sec} с").format(sec=sec) if sec else tr("зараз"))
         if len(self.points) < 2:
             p.setPen(qc("muted"))
             p.drawText(QRectF(left, top, w, h), Qt.AlignCenter,
-                       "Запустіть дані наживо — тут з’явиться графік")
+                       tr("Запустіть дані наживо — тут з’явиться графік"))
             return
         now = self.points[-1][0]
         pts = [QPointF(left + w * (1 - (now - t) / self.window), top + h - (v - lo) / (hi - lo) * h)

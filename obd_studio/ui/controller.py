@@ -14,6 +14,7 @@ from PySide6.QtCore import QObject, Signal
 
 from ..config import AppSettings, Timing
 from ..elm327 import CAN11, CAN29, Elm327, wifi_url
+from ..i18n import tr
 from ..kline import KLine
 from ..obd import ObdClient
 from ..pids import PIDS, decode_value
@@ -98,7 +99,7 @@ class Controller(QObject):
             return f"{b.name} · {year}"
         if b:
             return b.name
-        return "Авто не визначено"
+        return tr("Авто не визначено")
 
     def is_can(self):
         return isinstance(self.transport, Elm327) and self.transport.protocol in (CAN11 | CAN29)
@@ -128,7 +129,7 @@ class Controller(QObject):
         try:
             t.keepalive()
         except Exception as e:      # noqa: BLE001 — збій підтримки сесії не має заважати роботі
-            self._log(f"Підтримка сесії не вдалася: {e}")
+            self._log(tr("Підтримка сесії не вдалася: {error}").format(error=e))
         if not t.is_connected:
             self.connection_changed.emit()
 
@@ -140,11 +141,12 @@ class Controller(QObject):
         try:
             fn()
         except ObdError as e:
-            self._log(f"ПОМИЛКА: {e}")
+            self._log(tr("ПОМИЛКА: {error}").format(error=e))
             self.error.emit(str(e))
         except Exception as e:      # noqa: BLE001 — показуємо будь-яку несподівану помилку
             self._log(traceback.format_exc())
-            self.error.emit(f"Неочікувана помилка: {e}\n\nЗбережіть журнал і надішліть його.")
+            self.error.emit(tr("Неочікувана помилка: {error}\n\nЗбережіть журнал і надішліть його.")
+                            .format(error=e))
         finally:
             if self.transport:
                 self.transport.quiet = self._live
@@ -188,7 +190,7 @@ class Controller(QObject):
             self.live_last = {}
             if app.adapter == "kkl":
                 if not app.port:
-                    raise ObdError("Виберіть COM-порт кабелю KKL.")
+                    raise ObdError(tr("Виберіть COM-порт кабелю KKL."))
                 self.transport = KLine(app.port, self._log, timing)
                 where = app.port
             else:
@@ -196,27 +198,27 @@ class Controller(QObject):
                     url, where = wifi_url(app.wifi_host, app.wifi_port), f"{app.wifi_host}:{app.wifi_port}"
                 else:
                     if not app.port:
-                        raise ObdError("Виберіть COM-порт адаптера ELM327.")
+                        raise ObdError(tr("Виберіть COM-порт адаптера ELM327."))
                     url = where = app.port
                 self.transport = Elm327(url, self._log, app.elm_baud, app.elm_protocol, app.elm_timeout)
             self.obd = ObdClient(self.transport)
-            self.adapter_desc = f"{ADAPTER_NAMES[app.adapter]}, {where}"
-            self._log(f"Підключення: {self.adapter_desc}")
+            self.adapter_desc = f"{tr(ADAPTER_NAMES[app.adapter])}, {where}"
+            self._log(tr("Підключення: {adapter}").format(adapter=self.adapter_desc))
             try:
                 self.protocol_desc = self.transport.connect()
             except Exception:
                 self.transport.close()
                 raise
-            self._log(f"З’єднання встановлено: {self.protocol_desc}")
+            self._log(tr("З’єднання встановлено: {protocol}").format(protocol=self.protocol_desc))
             self.connection_changed.emit()
             sup = self.obd.supported_pids()
-            self._log(f"Блок підтримує {len(sup)} параметрів режиму 01")
+            self._log(tr("Блок підтримує {n} параметрів режиму 01").format(n=len(sup)))
             self._read_readiness()
             if isinstance(self.transport, Elm327):
                 self.voltage.emit(self.transport.read_voltage())
                 self._read_info()
 
-        self.submit("Підключення…", job)
+        self.submit(tr("Підключення…"), job)
 
     def disconnect(self):
         self.stop_live()
@@ -224,14 +226,14 @@ class Controller(QObject):
         def job():
             if self.transport:
                 self.transport.close()
-                self._log("Відключено")
+                self._log(tr("Відключено"))
             self.protocol_desc = ""
 
-        self.submit("Відключення…", job)
+        self.submit(tr("Відключення…"), job)
 
     def _require(self):
         if not self.connected:
-            raise ObdError("Немає з’єднання з авто. Спершу підключіться на сторінці «Підключення».")
+            raise ObdError(tr("Немає з’єднання з авто. Спершу підключіться на сторінці «Підключення»."))
 
     # ── діагностика ──
     def _read_readiness(self):
@@ -245,10 +247,10 @@ class Controller(QObject):
         if not ok:
             rd = self.readiness or self._read_readiness()
             if not rd or rd["dtc_count"]:
-                raise ObdError("Блок не відповів на запит помилок. Спробуйте ще раз.")
+                raise ObdError(tr("Блок не відповів на запит помилок. Спробуйте ще раз."))
             # деякі блоки ISO 9141 мовчать на запит 03, коли кодів немає
-            self._log("Блок не відповів на запит 03, але за PID 01 підтверджених помилок 0 — "
-                      "вважаю, що збережених кодів немає")
+            self._log(tr("Блок не відповів на запит 03, але за PID 01 підтверджених помилок 0 — "
+                         "вважаю, що збережених кодів немає"))
             stored, inferred = [], True
         pending, ok7 = self.obd.read_dtcs(0x07)
         result = {"stored": stored, "pending": pending if ok7 else [], "permanent": [],
@@ -271,14 +273,14 @@ class Controller(QObject):
         def job():
             self._require()
             self._read_dtcs()
-        self.submit("Зчитування кодів помилок…", job)
+        self.submit(tr("Зчитування кодів помилок…"), job)
 
     def read_readiness(self):
         def job():
             self._require()
             if self._read_readiness() is None:
-                raise ObdError("Блок не відповів на запит стану систем.")
-        self.submit("Зчитування готовності систем…", job)
+                raise ObdError(tr("Блок не відповів на запит стану систем."))
+        self.submit(tr("Зчитування готовності систем…"), job)
 
     def read_freeze(self):
         def job():
@@ -287,7 +289,7 @@ class Controller(QObject):
             self.freeze = None if fr is None else (fr[0], {pid: decode_value(pid, raw)
                                                            for pid, raw in fr[1].items()})
             self.freeze_ready.emit(self.freeze)
-        self.submit("Зчитування стоп-кадру…", job)
+        self.submit(tr("Зчитування стоп-кадру…"), job)
 
     def read_info(self):
         def job():
@@ -295,20 +297,20 @@ class Controller(QObject):
             self._read_info()
             if isinstance(self.transport, Elm327):
                 self.voltage.emit(self.transport.read_voltage())
-        self.submit("Зчитування даних авто…", job)
+        self.submit(tr("Зчитування даних авто…"), job)
 
     def clear_dtcs(self):
         def job():
             self._require()
             if not self.obd.clear_dtcs():
-                raise ObdError("Блок не підтвердив стирання. Переконайтеся, що двигун заглушено.")
-            self._log("Коди помилок стерто")
+                raise ObdError(tr("Блок не підтвердив стирання. Переконайтеся, що двигун заглушено."))
+            self._log(tr("Коди помилок стерто"))
             self.dtcs = {"stored": [], "pending": [], "permanent": [], "pending_supported": True}
             self.freeze = None
             self.cleared.emit()
             self.dtcs_ready.emit(self.dtcs)
             self._read_readiness()
-        self.submit("Стирання кодів помилок…", job)
+        self.submit(tr("Стирання кодів помилок…"), job)
 
     def quick_scan(self):
         """Готовність + усі коди + стоп-кадр (якщо є збережені коди) за один раз."""
@@ -329,7 +331,7 @@ class Controller(QObject):
                 "permanent": dtcs["permanent"],
                 "mil": bool(self.readiness and self.readiness["mil"]),
             })
-        self.submit("Повне сканування…", job)
+        self.submit(tr("Повне сканування…"), job)
 
     # ── дані наживо ──
     def set_live_pids(self, pids):
@@ -355,7 +357,7 @@ class Controller(QObject):
                         values[pid] = decode_value(pid, self.obd.read_pid(pid))
                         self._drain()
                         if not self.connected:
-                            raise ObdError("Зв’язок із машиною втрачено.")
+                            raise ObdError(tr("Зв’язок із машиною втрачено."))
                     if not self.live_pids:
                         time.sleep(0.2)
                         self._drain()
@@ -371,13 +373,13 @@ class Controller(QObject):
                         last_volt = time.perf_counter()
                     if first:
                         self.transport.quiet = True
-                        self._log("(дані наживо: подальший обмін у журнал не пишеться)")
+                        self._log(tr("(дані наживо: подальший обмін у журнал не пишеться)"))
                         first = False
             finally:
                 self._live = False
                 self.live_state.emit(False)
 
-        self.submit("Дані наживо", job, busy=False)
+        self.submit(tr("Дані наживо"), job, busy=False)
 
     def stop_live(self):
         self._live = False

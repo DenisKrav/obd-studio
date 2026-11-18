@@ -1,5 +1,7 @@
 """Коди помилок OBD-II: декодування та короткий український опис."""
 
+from .i18n import language, tr
+
 
 def decode_dtc(a, b):
     letter = "PCBU"[a >> 6]
@@ -244,21 +246,27 @@ def is_manufacturer_code(code):
 
 def describe_dtc(code, brand=None):
     """Опис коду. brand — назва марки для підказки щодо кодів виробника."""
+    if language() == "en":
+        from .locales.en_dtc import DTC_EN
+        if code in DTC_EN:
+            return DTC_EN[code]
     if code in DTC_TEXT:
         return DTC_TEXT[code]
     kind = code[0]
     if kind == "P":
         if code[1] in "13":
             if brand:
-                return f"код виробника ({brand}) — точний опис шукайте за кодом для {brand}"
-            return "код виробника — точний опис шукайте за кодом для вашої марки"
-        group = P_GROUPS.get(code[2], "")
-        return f"загальний код OBD-II, група: {group}. Точний опис шукайте за кодом"
+                return tr("код виробника ({brand}) — точний опис шукайте за кодом для {brand}"
+                          ).format(brand=tr(brand))
+            return tr("код виробника — точний опис шукайте за кодом для вашої марки")
+        group = tr(P_GROUPS.get(code[2], ""))
+        return tr("загальний код OBD-II, група: {group}. Точний опис шукайте за кодом"
+                  ).format(group=group)
     return {
-        "C": "шасі (ABS, підвіска тощо) — шукайте опис за кодом",
-        "B": "кузов (подушки безпеки, комфорт) — шукайте опис за кодом",
-        "U": "зв’язок між блоками — шукайте опис за кодом",
-    }.get(kind, "невідомий тип коду")
+        "C": tr("шасі (ABS, підвіска тощо) — шукайте опис за кодом"),
+        "B": tr("кузов (подушки безпеки, комфорт) — шукайте опис за кодом"),
+        "U": tr("зв’язок між блоками — шукайте опис за кодом"),
+    }.get(kind, tr("невідомий тип коду"))
 
 
 _HIGH = {"P0016", "P0017", "P0087", "P0093", "P0217", "P0219", "P0234", "P0335", "P0336",
