@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Віртуальне середовище
+.venv/
+
+# Збірка PyInstaller
+build/
+dist/
+*.spec
+
+# Особисті налаштування та журнали
+lancer_obd_settings.json
+obd_studio_settings.json
+obd_studio_history.json
+lancer_obd_*.txt
+obd_studio_*.txt
+obd_studio_*.csv
+obd_studio_*.html
