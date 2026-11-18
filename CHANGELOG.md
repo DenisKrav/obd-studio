@@ -7,7 +7,7 @@
 All notable changes to OBD Studio. Versions follow `X.Y.Z`: `X` — major changes,
 `Y` — new features, `Z` — fixes. Downloads: [Releases](https://github.com/DenisKrav/obd-studio/releases).
 
-### 1.1.0 — upcoming
+### 1.1.0 — 2026-11-18
 
 **New**
 
@@ -16,6 +16,11 @@ All notable changes to OBD Studio. Versions follow `X.Y.Z`: `X` — major change
   English.
 - Documentation in English and Ukrainian: README and a step-by-step
   [user guide](docs/user-guide.en.md).
+
+**Fixed**
+
+- Tabs in **Settings → KKL cable — timing** no longer switch when you scroll the page with the
+  mouse wheel.
 
 ### 1.0.0 — first release
 
@@ -52,7 +57,7 @@ All notable changes to OBD Studio. Versions follow `X.Y.Z`: `X` — major change
 Усі помітні зміни OBD Studio. Номер версії `X.Y.Z`: `X` — великі зміни, `Y` — нові функції,
 `Z` — виправлення. Завантаження: [сторінка випусків](https://github.com/DenisKrav/obd-studio/releases).
 
-### 1.1.0 — готується
+### 1.1.0 — 2026-11-18
 
 **Нове**
 
@@ -61,6 +66,11 @@ All notable changes to OBD Studio. Versions follow `X.Y.Z`: `X` — major change
   інша — англійська.
 - Документація українською та англійською: README і покроковий
   [посібник користувача](docs/user-guide.uk.md).
+
+**Виправлено**
+
+- Вкладки в **«Налаштування» → «Кабель KKL — часові параметри»** більше не перемикаються, коли
+  прокручуєте сторінку коліщатком миші.
 
 ### 1.0.0 — перший випуск
 
