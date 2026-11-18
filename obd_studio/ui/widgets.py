@@ -57,6 +57,11 @@ class SpinBox(QSpinBox):
 
 
 class _TabBar(QTabBar):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDrawBase(False)
+        self.setAutoFillBackground(False)
+
     def wheelEvent(self, e):
         e.ignore()
 

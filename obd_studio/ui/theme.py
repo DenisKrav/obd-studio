@@ -142,6 +142,7 @@ QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 QProgressBar {{ background: transparent; border: none; max-height: 3px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 1px; }}
 QTabWidget::pane {{ border: none; }}
+QTabBar {{ background: transparent; border: none; }}
 QTabBar::tab {{ background: transparent; color: {c['muted']}; padding: 8px 14px; border: none;
     border-bottom: 2px solid transparent; font-weight: 600; }}
 QTabBar::tab:selected {{ color: {c['text']}; border-bottom: 2px solid {c['accent']}; }}
