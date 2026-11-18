@@ -7,7 +7,7 @@ from collections import deque
 from PySide6.QtCore import QPointF, QRectF, Qt, QVariantAnimation, Signal
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
-                               QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
+                               QSizePolicy, QSpinBox, QTabBar, QTabWidget, QVBoxLayout, QWidget)
 
 from ..i18n import tr
 from . import icons
@@ -54,6 +54,19 @@ class SpinBox(QSpinBox):
             super().wheelEvent(e)
         else:
             e.ignore()
+
+
+class _TabBar(QTabBar):
+    def wheelEvent(self, e):
+        e.ignore()
+
+
+class TabWidget(QTabWidget):
+    """Вкладки, які перемикаються лише кліком: колесо миші гортає сторінку."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTabBar(_TabBar(self))
 
 
 class Card(QFrame):

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QCheckBox, QDial
                                QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QHBoxLayout,
                                QHeaderView, QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit,
                                QPushButton, QScrollArea, QSizePolicy, QTableWidget,
-                               QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
+                               QTableWidgetItem, QVBoxLayout, QWidget)
 
 from ..config import Timing
 from ..dtc import DTC_TEXT as DTC_TEXT_KNOWN
@@ -19,7 +19,7 @@ from ..vehicles import BRANDS
 from . import icons
 from .theme import Theme
 from .widgets import (Card, ComboBox, EmptyState, Gauge, LiveChart, PageHeader, Pill, SpinBox, StatTile,
-                      ValueTile, label)
+                      TabWidget, ValueTile, label)
 
 KIND_LABEL = {"stored": ("Збережена", "danger"), "pending": ("Очікує", "warning"),
               "permanent": ("Постійна", "accent")}
@@ -1022,7 +1022,7 @@ class SettingsPage(Page):
         kl = Card(tr("Кабель KKL — часові параметри"),
                   tr("Змінюйте, лише якщо машина не відповідає. Нові значення діють з наступного "
                      "підключення. Усі тривалості — у мілісекундах."))
-        tabs = QTabWidget()
+        tabs = TabWidget()
         pages = {}
         for g in self.GROUPS:
             w = QWidget()
